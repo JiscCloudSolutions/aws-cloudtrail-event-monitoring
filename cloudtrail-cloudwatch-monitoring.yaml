@@ -1,0 +1,218 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Parameters:
+  LogGroupRetentionDays:
+    Type: Number
+    Default: 90
+
+  CloudWatchMetricNamespace:
+    Type: String
+    Default: "monitoring"
+    Description: "The CloudWatch namespace you want to use for monitoring metrics"
+
+  ShouldCreateNewTrail:
+    AllowedValues:
+      - 'yes'
+      - 'no'
+    Default: 'yes'
+    Type: String
+    Description: 'Create the trail to monitor'
+
+Conditions:
+  CreateNewTrail: !Equals
+    - !Ref ShouldCreateNewTrail
+    - 'yes'
+
+Resources:
+  MonitoringSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: !Sub "${AWS::StackName}-monitoring-topic"
+      TopicName: !Sub "${AWS::StackName}-monitoring-topic"
+
+  MonitoringSNSTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowCloudTrail
+            Effect: "Allow"
+            Principal:
+              Service: "cloudtrail.amazonaws.com"
+            Resource: !Ref MonitoringSNSTopic
+            Action: "sns:Publish"
+      Topics:
+        - !Ref MonitoringSNSTopic
+      
+  MonitoringTrailBucket:
+    Condition: CreateNewTrail
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${AWS::StackName}-${AWS::AccountId}-${AWS::Region}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  MonitoringTrailBucketPolicy:
+    Condition: CreateNewTrail
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      PolicyDocument:
+        Id: "TrailBucket"
+        Version: "2012-10-17"
+        Statement:
+          - Sid: "AllowAclCheck"
+            Effect: "Allow"
+            Principal:
+              Service: "cloudtrail.amazonaws.com"
+            Action: "s3:GetBucketAcl"
+            Resource: !GetAtt MonitoringTrailBucket.Arn
+          - Sid: "AllowTrailWrite"
+            Effect: "Allow"
+            Principal:
+              Service: "cloudtrail.amazonaws.com"
+            Action: "s3:PutObject"
+            Resource: !Sub "${MonitoringTrailBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                "s3:x-amz-acl": "bucket-owner-full-control"
+      Bucket: !Ref MonitoringTrailBucket
+
+  MonitoringCloudWatchLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "${AWS::StackName}-cloudtrail-logs"
+      RetentionInDays: !Ref LogGroupRetentionDays
+
+  MonitoringCloudWatchLogRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "cloudtrail.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      RoleName: !Sub "${AWS::StackName}-cloudtrail-to-cloudwatch-role"
+
+  MonitoringCloudWatchLogPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: "Allow cloudtrail to write to cloudwatch log group"
+      ManagedPolicyName: !Sub "${AWS::StackName}-cloudtrail-to-cloudwatch-policy"
+      Roles: 
+        - !Ref MonitoringCloudWatchLogRole
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: ""
+            Effect: "Allow"
+            Action:
+              - "logs:CreateLogStream"
+              - "logs:PutLogEvents"
+            Resource: !GetAtt MonitoringCloudWatchLogGroup.Arn
+
+  CreateStackMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      FilterPattern: '{ ($.eventName = "CreateStack") && ($.userIdentity.sessionContext.sessionIssuer.userName = "stacksets-exec-*") }'
+      LogGroupName: !Ref MonitoringCloudWatchLogGroup
+      MetricTransformations:
+        - MetricName: "stackset-executions"
+          MetricNamespace: !Ref CloudWatchMetricNamespace
+          MetricValue: "1" 
+          DefaultValue: 0
+
+  CreateStackAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: "Alert when monitoring:stackset-executions metric is greater than 0 in last 5 minutes"
+      AlarmName: !Sub "${AWS::StackName}-org-stacksets-execution-alarm"
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      EvaluationPeriods: 1
+      Period: 60
+      Namespace: !Ref CloudWatchMetricNamespace
+      MetricName: "stackset-executions"
+      TreatMissingData: notBreaching
+      Statistic: "Average"
+      Threshold: 1
+      AlarmActions:
+        - !Ref MonitoringSNSTopic
+
+  MonitoringTrailKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: "Monitoring trail key"
+      KeyPolicy:
+        Version: "2012-10-17"
+        Id: "MonitoringKeyPolicy"
+        Statement:
+          - Sid: "Allow IAM"
+            Effect: "Allow"
+            Principal:
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action: "kms:*"
+            Resource: "*"
+          - Sid: "Allow CloudTrail encrypt"
+            Effect: "Allow"
+            Principal:
+              Service: "cloudtrail.amazonaws.com"
+            Action: "kms:GenerateDataKey*"
+            Resource: "*"
+            Condition:
+              StringLike:
+                "kms:EncryptionContext:aws:cloudtrail:arn": !Sub "arn:aws:cloudtrail:*:${AWS::AccountId}:trail/*"
+          - Sid: "Allow CloudTrail describe key"
+            Effect: "Allow"
+            Principal:
+              Service: "cloudtrail.amazonaws.com"
+            Action: "kms:DescribeKey"
+            Resource: "*"
+          - Sid: "Allow principals to decrypt log files"
+            Effect: "Allow"
+            Principal:
+              AWS: "*"
+            Action:
+              - "kms:Decrypt"
+              - "kms:ReEncryptFrom"
+            Resource: "*"
+            Condition:
+              StringEquals:
+                "kms:CallerAccount": ${AWS::AccountId}
+              StringLike:
+                "kms:EncryptionContext:aws:cloudtrail:arn": !Sub "arn:aws:cloudtrail:*:${AWS::AccountId}:trail/*"
+          - Sid: "Allow cross-account log decryption"
+            Effect: "Allow"
+            Principal:
+              AWS: "*"
+            Action:
+              - "kms:Decrypt"
+              - "kms:ReEncryptFrom"             
+            Resource: "*"
+            Condition:
+              StringEquals:
+                "kms:CallerAccount": ${AWS::AccountId}
+              StringLike:
+                "kms:EncryptionContext:aws:cloudtrail:arn": !Sub "arn:aws:cloudtrail:*:${AWS::AccountId}:trail/*"
+              
+  MonitoringTrail:
+    Condition: CreateNewTrail
+    Type: AWS::CloudTrail::Trail
+    Properties:
+      TrailName: !Sub "${AWS::StackName}-trail"
+      IsLogging: true
+      IsMultiRegionTrail: true
+      IncludeGlobalServiceEvents: true
+      CloudWatchLogsLogGroupArn: !Sub "${MonitoringCloudWatchLogGroup.Arn}"
+      CloudWatchLogsRoleArn: !Sub "${MonitoringCloudWatchLogRole.Arn}"
+      EnableLogFileValidation: true
+      KMSKeyId: !Ref MonitoringTrailKey
+      S3BucketName: !Ref MonitoringTrailBucket
+      S3KeyPrefix: "monitoring"
+      # No EventSelectors defaults logging "read and write management events"
