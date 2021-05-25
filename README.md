@@ -5,7 +5,7 @@ to monitor and alert on management events in an AWS account. Here we provide an 
 value 1 if a stackset is created via the management account. A CloudWatch alarm then alerts when the metric is greater than or 
 equal to 1.
 
-[Overview of monitoring architecture (diagram)](jisccloudsolutions.github.com/aws-cloudtrail-event-monitoring/linked-account-activity-monitoring-overview-diagram.png)
+[Overview of monitoring architecture (diagram)](linked-account-activity-monitoring-overview-diagram.png)
 
 ## How to use this template
 
@@ -56,5 +56,15 @@ are also costs associated with CloudWatch and sending alerts.
 
 This template was created mainly for low-traffic accounts - such as offsite backup storage only accounts - where access
 and account activity is infrequent. For these accounts the cost of an additional CloudTrail, etc. created here should
-be very small. If you have any concerns we recommend that you use AWS Budgets and monitor costs on your account and also
+be very small. (As an example, my test account for this is forecasting $0.18 monthly spend - it only has a linked account with
+this template applied). If you have any concerns we recommend that you use AWS Budgets and monitor costs on your account and also
 familiarise yourself with AWS pricing for the resources deployed here.
+
+https://aws.amazon.com/cloudtrail/pricing/
+https://aws.amazon.com/cloudwatch/pricing/
+https://aws.amazon.com/aws-cost-management/aws-budgets/
+
+## Need help?
+Please get in touch and we'll be happy to help! :-)
+https://www.jisc.ac.uk/cloud
+
