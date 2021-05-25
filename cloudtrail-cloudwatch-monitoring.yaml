@@ -10,19 +10,6 @@ Parameters:
     Default: "monitoring"
     Description: "The CloudWatch namespace you want to use for monitoring metrics"
 
-  ShouldCreateNewTrail:
-    AllowedValues:
-      - 'yes'
-      - 'no'
-    Default: 'yes'
-    Type: String
-    Description: 'Create the trail to monitor'
-
-Conditions:
-  CreateNewTrail: !Equals
-    - !Ref ShouldCreateNewTrail
-    - 'yes'
-
 Resources:
   MonitoringSNSTopic:
     Type: AWS::SNS::Topic
@@ -46,7 +33,6 @@ Resources:
         - !Ref MonitoringSNSTopic
       
   MonitoringTrailBucket:
-    Condition: CreateNewTrail
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub "${AWS::StackName}-${AWS::AccountId}-${AWS::Region}"
@@ -57,7 +43,6 @@ Resources:
         RestrictPublicBuckets: true
 
   MonitoringTrailBucketPolicy:
-    Condition: CreateNewTrail
     Type: AWS::S3::BucketPolicy
     Properties:
       PolicyDocument:
@@ -202,7 +187,6 @@ Resources:
                 "kms:EncryptionContext:aws:cloudtrail:arn": !Sub "arn:aws:cloudtrail:*:${AWS::AccountId}:trail/*"
               
   MonitoringTrail:
-    Condition: CreateNewTrail
     Type: AWS::CloudTrail::Trail
     Properties:
       TrailName: !Sub "${AWS::StackName}-trail"
