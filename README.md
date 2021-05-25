@@ -7,6 +7,9 @@ equal to 1.
 
 ![Overview of monitoring architecture (diagram)](linked-account-activity-monitoring-overview-diagram.png)
 
+Even though I only specify a single alarm action here, on testing AWS send two - one on Alarm and one on OK. You have to interpret
+this as the first one is an important alarm. The second just says no more stacksets were applied in the last five minutes.
+
 ## How to use this template
 
 If you do not have existing monitoring SNS topics nor CloudTrail enabled on your account, you can deploy the template as is.
