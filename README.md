@@ -5,7 +5,7 @@ to monitor and alert on management events in an AWS account. Here we provide an 
 value 1 if a stackset is created via the management account. A CloudWatch alarm then alerts when the metric is greater than or 
 equal to 1.
 
-[Overview of monitoring architecture (diagram)](linked-account-activity-monitoring-overview-diagram.png)
+![Overview of monitoring architecture (diagram)](linked-account-activity-monitoring-overview-diagram.png)
 
 ## How to use this template
 
@@ -65,6 +65,6 @@ https://aws.amazon.com/cloudwatch/pricing/
 https://aws.amazon.com/aws-cost-management/aws-budgets/
 
 ## Need help?
-Please get in touch and we'll be happy to help! :-)
+Please get in touch and we'll be happy to help where we can.
 https://www.jisc.ac.uk/cloud
 
