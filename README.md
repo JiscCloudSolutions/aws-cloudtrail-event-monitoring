@@ -60,11 +60,12 @@ be very small. (As an example, my test account for this is forecasting $0.18 mon
 this template applied). If you have any concerns we recommend that you use AWS Budgets and monitor costs on your account and also
 familiarise yourself with AWS pricing for the resources deployed here.
 
-https://aws.amazon.com/cloudtrail/pricing/
-https://aws.amazon.com/cloudwatch/pricing/
-https://aws.amazon.com/aws-cost-management/aws-budgets/
+* https://aws.amazon.com/cloudtrail/pricing/
+* https://aws.amazon.com/cloudwatch/pricing/
+* https://aws.amazon.com/aws-cost-management/aws-budgets/
 
 ## Need help?
 Please get in touch and we'll be happy to help where we can.
+
 https://www.jisc.ac.uk/cloud
 
